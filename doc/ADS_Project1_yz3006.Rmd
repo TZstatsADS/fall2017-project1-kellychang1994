@@ -1,0 +1,320 @@
+---
+title: "ADS_project1_yz3006"
+author: "Yi Zhang ; yz3006"
+date: "9/29/2017"
+output: html_document
+---
+
+Every four years people witness the U.S. presidential inauguration. It always leads to wide discussion since the speeches are related to what the president would put emphasis in four years. Thus, exploring the speeches of all the U.S. presidents is becoming a popular topic. Using basic text mining and nlp process, I get some results shown as below. 
+
+```{r,message=FALSE, warning=FALSE}
+library("tm")
+library("wordcloud")
+library("RColorBrewer")
+library("dplyr")
+library("tidytext")
+library("rvest")
+library("tibble")
+library("qdap")
+library("sentimentr")
+library("gplots")
+library("dplyr")
+library("syuzhet")
+library("factoextra")
+library("beeswarm")
+library("scales")
+library("RANN")
+library("tm")
+library("topicmodels")
+library("xlsx")
+
+source("/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/lib/plotstacked.R")
+source("/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/lib/speechFuncs.R")
+```
+
+
+Firstly show the WordCloud for overall speeches and indivisual speeches respectively.
+```{r,message=FALSE, warning=FALSE}
+folder.path = '/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/data/InauguralSpeeches'
+speeches=list.files(path = folder.path, pattern = "*.txt")
+prex.out=substr(speeches, 6, nchar(speeches)-4)
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+ff.all<-Corpus(DirSource(folder.path))
+ff.all<-tm_map(ff.all, stripWhitespace) #delete extra white space
+ff.all<-tm_map(ff.all, content_transformer(tolower)) #convert upper-case to lower-case
+ff.all<-tm_map(ff.all, removeWords, stopwords("english")) # remove filler words
+ff.all<-tm_map(ff.all, removeWords, character(0)) # remove empty strings
+ff.all<-tm_map(ff.all, removePunctuation) # remove punctuation
+tdm.all<-TermDocumentMatrix(ff.all) 
+tdm.tidy=tidy(tdm.all) # a dataframe with three variables: term, document, and count
+tdm.overall=summarise(group_by(tdm.tidy, term), sum(count)) # a dataframe with two variables: term and count
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(7,"Blues")
+          )
+```
+
+As is shown in the plot, "will", "government" and "people" are top 3 frequently used words in presidential inauguration speeches. Then let we plot wordcloud for two parties to see if there is any difference in frenquency of word. 
+
+```{r,message=FALSE, warning=FALSE}
+data = read.xlsx("/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/data/InaugurationInfo.xlsx", sheetIndex = 1)
+CorpusTo = lapply(ff.all, scan_tokenizer)
+Df = data.frame(text = sapply(CorpusTo, paste, collapse = " "), stringsAsFactors = FALSE)
+Df = cbind(data,Df)
+Df[] = lapply(Df, as.character)
+#For DEMOCRATIC
+demo=Df$text[nrow(Df)]
+for (i in seq(nrow(Df)))
+{
+  if(is.na(Df$Party[i]))
+  {
+    Df$Party[i]="NP"
+  }
+  
+  if((Df$Party[i]=="Democratic"))
+  {
+    temp=Df$text[i]  
+    demo=rbind(demo,temp)
+  }
+}
+
+
+#For REPUBLICAN
+repub=Df$text[nrow(Df)]
+for (i in seq(nrow(Df)))
+{
+  if(is.na(Df$Party[i]))
+  {
+    Df$Party[i]="NP"
+  }
+  
+  if((Df$Party[i]=="Republican"))
+  {
+    temp=Df$text[i]  
+    repub=rbind(repub,temp)
+  }
+}
+
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+#Basic text mining as we did in the previous part in overall speeches
+repub.corpus=Corpus(DataframeSource(repub))
+demo.corpus=Corpus(DataframeSource(demo))
+repub = tm_map(repub.corpus, stripWhitespace) 
+repub = tm_map(repub.corpus, content_transformer(tolower))
+repub = tm_map(repub.corpus, removeWords, stopwords("english"))
+repub = tm_map(repub.corpus, removeWords, character(0))
+repub = tm_map(repub.corpus, removePunctuation)
+demo = tm_map(demo.corpus, stripWhitespace) 
+demo = tm_map(demo.corpus, content_transformer(tolower))
+demo = tm_map(demo.corpus, removeWords, stopwords("english"))
+demo = tm_map(demo.corpus, removeWords, character(0))
+demo = tm_map(demo.corpus, removePunctuation)
+tdm.repub<-TermDocumentMatrix(repub)
+tdm.demo<-TermDocumentMatrix(demo)
+tdm.tidy.repub = tidy(tdm.repub)
+tdm.tidy.demo = tidy(tdm.demo)
+tdm.overall.repub=summarise(group_by(tdm.tidy.repub, term), sum(count))
+tdm.overall.demo=summarise(group_by(tdm.tidy.demo, term), sum(count))
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+par(mfrow=c(1,2))
+wordcloud(tdm.overall.repub$term, tdm.overall.repub$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(7,"Reds"),
+          title = 'WordCloud-Republican party')
+
+wordcloud(tdm.overall.demo$term, tdm.overall.demo$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(7,"Greens"),
+          title = 'WordCloud-Democratic party')
+```
+
+It looks like apart from the most frequently words in overall speeches the Republican use a lot "country", "shall", "public", "may", and etc. While the Democratic is more likely to put in the speeches "new", "must", "every", "can", "peace", and etc.
+
+Then we use sentiment analysis to explore more about the texts.
+```{r,message=FALSE, warning=FALSE}
+setwd("/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/data/InauguralSpeeches")
+data = read.xlsx("/Users/YIZHANG/Desktop/fall2017-Project1-kellychang1994-master/data/InaugurationInfo.xlsx", sheetIndex= 1)
+ups = unique(data$File)
+files = paste0("inaug",paste(data$File, data$Term, sep = "-"),".txt")
+speech.list = NULL
+for(i in 1:length(files)){
+  sp = paste(readLines(files[i],n=-1, skipNul=TRUE),collapse=" ")
+  speech.list  = c(speech.list, sp)
+}
+speech.list = data.frame(fulltext = speech.list)
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+sentence.list=NULL
+for(i in 1:nrow(speech.list)){
+  sentences=sent_detect(speech.list$fulltext[i],
+                        endmarks = c("?", ".", "!", "|",";"))
+  if(length(sentences)>0){
+    emotions=get_nrc_sentiment(sentences)
+    word.count=word_count(sentences)
+    emotions=diag(1/(word.count+0.01))%*%as.matrix(emotions)
+    sentence.list=rbind(sentence.list, 
+                        cbind(speech.list[i,-ncol(speech.list)],
+                              sentences=as.character(sentences), 
+                              word.count,
+                              emotions,
+                              sent.id=1:length(sentences), File = data$File[i],
+                              Term = data$Term[i]
+                        )
+    )
+  }
+}
+# some non-sentences exist in raw data due to erroneous extra end-of sentence marks
+sentence.list=
+  sentence.list%>%
+  filter(!is.na(word.count))
+```
+
+Choosing a list of famous presidents or presidents candidates, we analyse their sentences in the speeches in some simple visualization.
+
+```{r,message=FALSE, warning=FALSE}
+sel.comparison=c("DonaldJTrump","JohnMcCain", "GeorgeBush", "MittRomney", "GeorgeWBush", "RonaldReagan","AlbertGore,Jr","HillaryClinton","JohnFKerry", "WilliamJClinton","HarrySTruman", "BarackObama", "LyndonBJohnson","GeraldRFord", "JimmyCarter", "DwightDEisenhower", "FranklinDRoosevelt","HerbertHoover","JohnFKennedy","RichardNixon","WoodrowWilson","AbrahamLincoln", "TheodoreRoosevelt", "JamesGarfield","JohnQuincyAdams", "UlyssesSGrant", "ThomasJefferson", "GeorgeWashington", "WilliamHowardTaft", "AndrewJackson","WilliamHenryHarrison", "JohnAdams")
+```
+
+
+```{r,message=FALSE, warning=FALSE}
+par(mar=c(4, 11, 2, 2))
+pos = which(sentence.list$Term==1 & sentence.list$File%in%sel.comparison)
+#sel.comparison=levels(sentence.list$FileOrdered)
+sentence.list.sel= sentence.list[pos,]
+sentence.list.sel$File= factor(sentence.list.sel$File)
+
+sentence.list.sel$FileOrdered=reorder(sentence.list.sel$File, 
+                                      sentence.list.sel$word.count, 
+                                      mean, 
+                                      order=T)
+
+
+beeswarm(word.count~FileOrdered, 
+         data=sentence.list.sel,
+         horizontal = TRUE, 
+         pch=16, col=alpha(brewer.pal(9, "Set1"), 0.6), 
+         cex=0.55, cex.axis=0.8, cex.lab=0.8,
+         spacing=5/nlevels(sentence.list.sel$FileOrdered),
+         las=2, xlab="Number of words in a sentence.", ylab="",
+         main="Nomination speeches")
+```
+
+
+Next we compare the length of sentences in Obama and Trump inauguration.
+```{r,message=FALSE, warning=FALSE}
+sentence.list %>%
+  filter(File == 'DonaldJTrump',
+         word.count <= 3) %>%
+  select(sentences)
+
+sentence.list %>%
+  filter(File == 'BarackObama',
+         word.count <= 3) %>%
+  select(sentences)
+
+```
+
+It presents simple and informal sentence in speeches for both of them.
+Now we look at the emotions reflected by their speeches. 
+
+
+```{r,message=FALSE, warning=FALSE}
+# Clustering of Emotions for All Speeches
+heatmap.2(cor(sentence.list%>%select(anger:trust)), 
+          scale = "none", 
+          col = bluered(100),  margin=c(6, 6), key=F,
+          trace = "none", density.info = "none")
+```
+
+```{r,message=FALSE, warning=FALSE}
+#make barplot for the average value of clustering emotions
+par(mar=c(4, 6, 2, 1))
+emo.means=colMeans(select(sentence.list, anger:trust)>0.01)
+col.use=c("red2", "darkgoldenrod1", 
+          "chartreuse3", "blueviolet",
+          "darkgoldenrod2", "dodgerblue3", 
+          "darkgoldenrod1", "darkgoldenrod1")
+barplot(emo.means[order(emo.means)], las=2, col=col.use[order(emo.means)], horiz=T, main="Inaugural Speeches")
+```
+
+It is shown that presidents have tendency to pass positive words to the audience and hence they could get more support in return.
+Let us look at the example of Trump and Obama.
+
+```{r,message=FALSE, warning=FALSE}
+# Sentences with emotions for Trump and Obama
+speech.df = tbl_df(sentence.list) %>%
+  filter(File == 'DonaldJTrump', word.count >= 4) %>%
+  select(sentences, anger:trust)
+speech.df = as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+
+print('Barack Obama')
+speech.df = tbl_df(sentence.list) %>%
+  filter(File == 'BarackObama', word.count >= 4) %>%
+  select(sentences, anger:trust)
+speech.df = as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+```
+
+The difference in the two examples is that Trump seems to repeat some sentences which may reflect what he would expect America to be, such as winnning again and being more powerful; however, Obama is more likely to put sentences containing like "capital", "wages" and "labor".
+Then we explore the clustering emotions among all speeches by 5 groups. 
+
+```{r,message=FALSE, warning=FALSE}
+presid.summary=tbl_df(sentence.list)%>%
+  subset(File%in%sel.comparison)%>%
+  group_by(File)%>%
+  summarise(
+    anger=mean(anger),
+    anticipation=mean(anticipation),
+    disgust=mean(disgust),
+    fear=mean(fear),
+    joy=mean(joy),
+    sadness=mean(sadness),
+    surprise=mean(surprise),
+    trust=mean(trust)
+  )
+presid.summary=as.data.frame(presid.summary)
+rownames(presid.summary)=as.character((presid.summary[,1]))
+
+# Perform k-means clustering on emotions data frame
+km.res=kmeans(presid.summary[,-1], iter.max=200,
+              5)
+fviz_cluster(km.res, 
+             stand=F, repel= TRUE,
+             data = presid.summary[,-1], xlab="", xaxt="n",
+             show.clust.cent=FALSE)
+```
+
